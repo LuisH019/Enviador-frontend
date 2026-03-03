@@ -12,9 +12,79 @@ import { ContactChannelSection } from './send-page/ContactChannelSection'
 import { AttachmentWarningsModal } from './send-page/AttachmentWarningsModal'
 import { ColumnModals } from './send-page/ColumnModals'
 import { parseFile, headersEqual, type Row } from '../utils/fileUtils'
+import { getWhatsAppConfigStatus } from '../utils/accountSettingsStorage'
+import { accountSettingsService } from '../services/accountSettingsService'
+import { AccountSettings } from '../types/accountSettings'
 
-export default function SendPage() {
+type VariableBinding = {
+  mode: 'column' | 'fixed'
+  column: string
+  value: string
+}
+
+type SendDraft = {
+  channel: 'whatsapp' | 'email' | 'none'
+  message: string
+  subject: string
+  selectedEmailSender: string
+  selectedEmailTemplateTitle: string
+  selectedWhatsappSenderId: string
+  selectedWhatsappTemplateTitle: string
+  whatsappVariableBindings: Record<string, VariableBinding>
+  phoneColumn: string
+  emailColumn: string
+  fileColumn: string
+  matchMode: 'igual' | 'contem' | 'comeca_com' | 'termina_com'
+}
+
+const SEND_DRAFT_STORAGE_KEY = 'enviador_send_draft_v1'
+
+function loadSendDraft(): SendDraft | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem(SEND_DRAFT_STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as SendDraft
+  } catch {
+    return null
+  }
+}
+
+type SendPageProps = {
+  onNavigate?: (page: 'home' | 'send' | 'account' | 'contact' | 'login' | 'signup') => void
+}
+
+export default function SendPage({ onNavigate }: SendPageProps) {
   const { token } = useAuth()
+  const [accountSettings, setAccountSettings] = useState<AccountSettings>(() => accountSettingsService.getCachedSettings())
+  const initialDraft = React.useMemo(() => loadSendDraft(), [])
+
+  const buildWhatsappStatus = React.useCallback((sender: {
+    phoneNumber: string
+    accessToken: string
+    phoneNumberId: string
+    businessId: string
+    templates: Array<{ title: string }>
+  } | null) => {
+    if (!sender) {
+      return getWhatsAppConfigStatus({
+        phoneNumber: '',
+        accessToken: '',
+        phoneNumberId: '',
+        businessId: '',
+        templates: []
+      })
+    }
+
+    return getWhatsAppConfigStatus({
+      phoneNumber: sender.phoneNumber,
+      accessToken: sender.accessToken,
+      phoneNumberId: sender.phoneNumberId,
+      businessId: sender.businessId,
+      templates: sender.templates.map(template => template.title)
+    })
+  }, [])
   
   // Data state
   const [headers, setHeaders] = useState<string[]>([])
@@ -22,20 +92,22 @@ export default function SendPage() {
   
   // Channel & configuration
   const [channel, setChannel] = useState<'whatsapp' | 'email' | 'none'>('none')
-  const [message, setMessage] = useState<string>('Olá {Nome}, este é um teste!')
-  const [subject, setSubject] = useState<string>('')
-  const [senderId, setSenderId] = useState<string>('')
-  const [appPassword, setAppPassword] = useState<string>('')
-  const [showPasswordInput, setShowPasswordInput] = useState<boolean>(false)
+  const [message, setMessage] = useState<string>(initialDraft?.message || 'Olá {Nome}, este é um teste!')
+  const [subject, setSubject] = useState<string>(initialDraft?.subject || '')
+  const [selectedEmailSender, setSelectedEmailSender] = useState<string>(initialDraft?.selectedEmailSender || accountSettings.gmail.senderEmail)
+  const [selectedEmailTemplateTitle, setSelectedEmailTemplateTitle] = useState<string>(initialDraft?.selectedEmailTemplateTitle || '')
+  const [selectedWhatsappSenderId, setSelectedWhatsappSenderId] = useState<string>(initialDraft?.selectedWhatsappSenderId || '')
+  const [selectedWhatsappTemplateTitle, setSelectedWhatsappTemplateTitle] = useState<string>(initialDraft?.selectedWhatsappTemplateTitle || '')
+  const [whatsappVariableBindings, setWhatsappVariableBindings] = useState<Record<string, VariableBinding>>(initialDraft?.whatsappVariableBindings || {})
   
   // Attachments
   const [attachments, setAttachments] = useState<File[]>([])
-  const [fileColumn, setFileColumn] = useState<string>('')
-  const [matchMode, setMatchMode] = useState<'igual' | 'contem' | 'comeca_com' | 'termina_com'>('contem')
+  const [fileColumn, setFileColumn] = useState<string>(initialDraft?.fileColumn || '')
+  const [matchMode, setMatchMode] = useState<'igual' | 'contem' | 'comeca_com' | 'termina_com'>(initialDraft?.matchMode || 'contem')
   
   // Contact columns
-  const [phoneColumn, setPhoneColumn] = useState<string>('')
-  const [emailColumn, setEmailColumn] = useState<string>('')
+  const [phoneColumn, setPhoneColumn] = useState<string>(initialDraft?.phoneColumn || '')
+  const [emailColumn, setEmailColumn] = useState<string>(initialDraft?.emailColumn || '')
   
   // Pagination
   const [pageSize, setPageSize] = useState<number>(20)
@@ -81,6 +153,76 @@ export default function SendPage() {
     none: { bg: 'bg-blue-50', border: 'border-blue-200', accent: 'text-blue-600', btnClass: 'btn-primary' }
   } as const
   const currentTheme = themeMap[channel]
+  const activeWhatsappSender = accountSettings.whatsappSenders.find(sender =>
+    sender.phoneNumber === accountSettings.whatsapp.phoneNumber &&
+    sender.phoneNumberId === accountSettings.whatsapp.phoneNumberId &&
+    sender.businessId === accountSettings.whatsapp.businessId
+  )
+  const configuredWhatsappSenders = React.useMemo(
+    () => accountSettings.whatsappSenders.filter(sender => buildWhatsappStatus(sender).isConfigured),
+    [accountSettings.whatsappSenders, buildWhatsappStatus]
+  )
+  const selectedWhatsappSender = accountSettings.whatsappSenders.find(sender => sender.id === selectedWhatsappSenderId) || null
+  const effectiveWhatsappSender =
+    (selectedWhatsappSender && buildWhatsappStatus(selectedWhatsappSender).isConfigured ? selectedWhatsappSender : null) ||
+    (activeWhatsappSender && buildWhatsappStatus(activeWhatsappSender).isConfigured ? activeWhatsappSender : null) ||
+    configuredWhatsappSenders[0] ||
+    selectedWhatsappSender ||
+    activeWhatsappSender ||
+    accountSettings.whatsappSenders[0] ||
+    null
+  const whatsappStatus = buildWhatsappStatus(effectiveWhatsappSender)
+  const isWhatsappEnabled = configuredWhatsappSenders.length > 0
+  const isEmailEnabled = Boolean(accountSettings.gmail.senderEmail && accountSettings.gmail.appPassword)
+  const selectedEmailSenderRecord = accountSettings.gmailSenders.find(sender => sender.senderEmail === selectedEmailSender) || null
+  const emailTemplates = selectedEmailSenderRecord?.templates || []
+  const selectedEmailTemplate = emailTemplates.find(template => template.title === selectedEmailTemplateTitle) || null
+  const whatsappTemplates = effectiveWhatsappSender?.templates || []
+  const selectedWhatsappTemplate = whatsappTemplates.find(template => template.title === selectedWhatsappTemplateTitle) || null
+  const whatsappTemplateVariables = React.useMemo(() => {
+    if (!selectedWhatsappTemplate) return [] as string[]
+
+    const vars = new Set<string>()
+    const curlyMatches = selectedWhatsappTemplate.content.matchAll(/\{([^{}]+)\}/g)
+    for (const match of curlyMatches) {
+      const variable = match[1].trim()
+      if (variable) vars.add(variable)
+    }
+
+    return Array.from(vars)
+  }, [selectedWhatsappTemplate])
+
+  useEffect(() => {
+    if (!token) return
+
+    let mounted = true
+
+    accountSettingsService
+      .getSettings(token)
+      .then((loaded) => {
+        if (!mounted) return
+        setAccountSettings(loaded)
+        setSelectedEmailSender(prev => prev || loaded.gmail.senderEmail)
+        const initialEmailSender = loaded.gmailSenders.find(sender => sender.senderEmail === loaded.gmail.senderEmail) || loaded.gmailSenders[0]
+        const initialEmailTemplate = initialEmailSender?.templates?.[0]
+        setSelectedEmailTemplateTitle(prev => prev || initialEmailTemplate?.title || '')
+
+        const activeSender = loaded.whatsappSenders.find(sender =>
+          sender.phoneNumber === loaded.whatsapp.phoneNumber &&
+          sender.phoneNumberId === loaded.whatsapp.phoneNumberId &&
+          sender.businessId === loaded.whatsapp.businessId
+        )
+        setSelectedWhatsappSenderId(prev => prev || activeSender?.id || loaded.whatsappSenders[0]?.id || '')
+        const firstTemplate = activeSender?.templates?.[0]
+        setSelectedWhatsappTemplateTitle(prev => prev || firstTemplate?.title || '')
+      })
+      .catch(() => {
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [token])
 
   // Auto-configure contact column based on channel
   useEffect(() => {
@@ -97,7 +239,7 @@ export default function SendPage() {
       const phoneCols = headers.filter(h => 
         h.toLowerCase().includes('telefone') || 
         h.toLowerCase().includes('celular') || 
-        h.toLowerCase().includes('numero') || 
+        h.toLowerCase().includes('') || 
         h.toLowerCase().includes('número') || 
         h.toLowerCase().includes('phone') || 
         h.toLowerCase().includes('whatsapp') ||
@@ -108,6 +250,141 @@ export default function SendPage() {
       }
     }
   }, [channel, headers, emailColumn, phoneColumn])
+
+  useEffect(() => {
+    if (channel === 'email' && !isEmailEnabled) {
+      setChannel('none')
+      return
+    }
+
+    if (channel === 'whatsapp' && !isWhatsappEnabled) {
+      setChannel('none')
+    }
+  }, [channel, isEmailEnabled, isWhatsappEnabled])
+
+  useEffect(() => {
+    if (!selectedEmailSender && accountSettings.gmailSenders.length > 0) {
+      setSelectedEmailSender(accountSettings.gmailSenders[0].senderEmail)
+      return
+    }
+
+    const senderExists = accountSettings.gmailSenders.some(sender => sender.senderEmail === selectedEmailSender)
+    if (!senderExists) {
+      setSelectedEmailSender(accountSettings.gmailSenders[0]?.senderEmail || '')
+    }
+  }, [selectedEmailSender, accountSettings.gmailSenders])
+
+  useEffect(() => {
+    if (!selectedEmailTemplateTitle && emailTemplates.length > 0) {
+      setSelectedEmailTemplateTitle(emailTemplates[0].title)
+      return
+    }
+
+    const templateExists = emailTemplates.some(template => template.title === selectedEmailTemplateTitle)
+    if (!templateExists) {
+      setSelectedEmailTemplateTitle(emailTemplates[0]?.title || '')
+    }
+  }, [selectedEmailTemplateTitle, emailTemplates])
+
+  useEffect(() => {
+    if (!selectedEmailTemplate) return
+
+    setSubject(selectedEmailTemplate.subject || '')
+    setMessage(selectedEmailTemplate.content || '')
+  }, [selectedEmailTemplate])
+
+  useEffect(() => {
+    if (channel !== 'whatsapp') return
+
+    if (!effectiveWhatsappSender) {
+      if (selectedWhatsappSenderId) setSelectedWhatsappSenderId('')
+      return
+    }
+
+    const senderExists = accountSettings.whatsappSenders.some(sender => sender.id === selectedWhatsappSenderId)
+    const selectedIsConfigured = Boolean(
+      selectedWhatsappSender && buildWhatsappStatus(selectedWhatsappSender).isConfigured
+    )
+
+    if (!selectedWhatsappSenderId || !senderExists || !selectedIsConfigured) {
+      setSelectedWhatsappSenderId(effectiveWhatsappSender.id)
+    }
+  }, [
+    channel,
+    selectedWhatsappSenderId,
+    accountSettings.whatsappSenders,
+    effectiveWhatsappSender,
+    selectedWhatsappSender,
+    buildWhatsappStatus
+  ])
+
+  useEffect(() => {
+    if (channel !== 'whatsapp') return
+    if (!selectedWhatsappTemplateTitle && whatsappTemplates.length > 0) {
+      setSelectedWhatsappTemplateTitle(whatsappTemplates[0].title)
+      return
+    }
+
+    const templateExists = whatsappTemplates.some(template => template.title === selectedWhatsappTemplateTitle)
+    if (!templateExists) {
+      setSelectedWhatsappTemplateTitle(whatsappTemplates[0]?.title || '')
+    }
+  }, [channel, selectedWhatsappTemplateTitle, whatsappTemplates])
+
+  useEffect(() => {
+    if (channel !== 'whatsapp') return
+    if (!selectedWhatsappTemplate) {
+      setMessage('')
+      return
+    }
+    setMessage(selectedWhatsappTemplate.content)
+  }, [channel, selectedWhatsappTemplate])
+
+  useEffect(() => {
+    if (channel !== 'whatsapp') return
+
+    setWhatsappVariableBindings(prev => {
+      const next: Record<string, VariableBinding> = {}
+      whatsappTemplateVariables.forEach(variable => {
+        next[variable] = prev[variable] || { mode: 'column', column: '', value: '' }
+      })
+      return next
+    })
+  }, [channel, whatsappTemplateVariables])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const draft: SendDraft = {
+      channel,
+      message,
+      subject,
+      selectedEmailSender,
+      selectedEmailTemplateTitle,
+      selectedWhatsappSenderId,
+      selectedWhatsappTemplateTitle,
+      whatsappVariableBindings,
+      phoneColumn,
+      emailColumn,
+      fileColumn,
+      matchMode
+    }
+
+    window.localStorage.setItem(SEND_DRAFT_STORAGE_KEY, JSON.stringify(draft))
+  }, [
+    channel,
+    message,
+    subject,
+    selectedEmailSender,
+    selectedEmailTemplateTitle,
+    selectedWhatsappSenderId,
+    selectedWhatsappTemplateTitle,
+    whatsappVariableBindings,
+    phoneColumn,
+    emailColumn,
+    fileColumn,
+    matchMode
+  ])
 
   // File handling
   async function handleFiles(files: FileList | null) {
@@ -297,33 +574,68 @@ export default function SendPage() {
   }
 
   async function handleSend() {
+    if (channel === 'none') {
+      setErrorModal({ title: 'Campo obrigatório', message: 'Selecione um canal antes de enviar.' })
+      return
+    }
+
     if (rows.length === 0) {
       setErrorModal({ title: 'Sem dados', message: 'Nenhum destinatário carregado.' })
       return
     }
     
     const contactColumn = channel === 'whatsapp' ? phoneColumn : channel === 'email' ? emailColumn : ''
+
+    if (channel === 'whatsapp') {
+      if (!effectiveWhatsappSender) {
+        setErrorModal({ title: 'Campo obrigatório', message: 'Selecione um remetente de WhatsApp para continuar.' })
+        return
+      }
+
+      if (!isWhatsappEnabled) {
+        setErrorModal({
+          title: 'WhatsApp não habilitado',
+          message: `Finalize o cadastro na aba Conta para enviar via WhatsApp. Faltando: ${whatsappStatus.missingFields.join(', ')}`
+        })
+        return
+      }
+
+      if (!selectedWhatsappTemplate) {
+        setErrorModal({ title: 'Campo obrigatório', message: 'Selecione uma template de WhatsApp para continuar.' })
+        return
+      }
+
+      const missingColumnBinding = whatsappTemplateVariables.find(variable => {
+        const binding = whatsappVariableBindings[variable]
+        return binding?.mode === 'column' && !binding.column
+      })
+
+      if (missingColumnBinding) {
+        setErrorModal({ title: 'Variável sem vínculo', message: `Selecione uma coluna para a variável "${missingColumnBinding}" ou altere para valor fixo.` })
+        return
+      }
+    }
+
+    if (channel === 'email') {
+      if (!isEmailEnabled) {
+        setErrorModal({
+          title: 'Email não habilitado',
+          message: 'Finalize o cadastro de Gmail na aba Conta para enviar emails.'
+        })
+        return
+      }
+
+      if (!selectedEmailSender) {
+        setErrorModal({ title: 'Campo obrigatório', message: 'Selecione um remetente cadastrado para envio por email.' })
+        return
+      }
+    }
     
     if (!contactColumn) {
       setErrorModal({ title: 'Campo obrigatório', message: `Selecione a coluna de ${channel === 'whatsapp' ? 'número' : 'email'} antes de enviar.` })
       return
     }
 
-    if (channel === 'email' && !senderId) {
-      setErrorModal({ title: 'Campo obrigatório', message: 'Informe o email remetente para enviar emails.' })
-      return
-    }
-
-    if (channel === 'email' && !appPassword) {
-      setErrorModal({ title: 'Campo obrigatório', message: 'Informe a senha de app do Gmail para enviar emails.' })
-      return
-    }
-
-    if (channel === 'whatsapp' && !senderId) {
-      setErrorModal({ title: 'Campo obrigatório', message: 'Informe o número de telefone para enviar via WhatsApp.' })
-      return
-    }
-    
     const invalid = rows.filter(r => !(r[contactColumn] && r[contactColumn].trim()))
     if (invalid.length > 0) {
       if (!confirm(`${invalid.length} linhas sem ${channel === 'whatsapp' ? 'número' : 'email'}. Continuar mesmo assim?`)) return
@@ -462,12 +774,27 @@ export default function SendPage() {
 
     if (channel === 'email') {
       payload.subject = subject
-      payload.email_sender = senderId
-      payload.app_password = appPassword
+      payload.email_sender = selectedEmailSender
+      payload.app_password = accountSettings.gmail.appPassword
+      payload.email_template_title = selectedEmailTemplateTitle || null
     }
 
     if (channel === 'whatsapp') {
-      payload.phone_number = senderId
+      payload.whatsapp_sender_id = effectiveWhatsappSender?.id || null
+      payload.phone_number = effectiveWhatsappSender?.phoneNumber || ''
+      payload.whatsapp_access_token = effectiveWhatsappSender?.accessToken || ''
+      payload.whatsapp_phone_number_id = effectiveWhatsappSender?.phoneNumberId || ''
+      payload.whatsapp_business_id = effectiveWhatsappSender?.businessId || ''
+      payload.whatsapp_template_title = selectedWhatsappTemplateTitle
+      payload.whatsapp_template_variables = whatsappTemplateVariables.map(variable => {
+        const binding = whatsappVariableBindings[variable] || { mode: 'fixed', column: '', value: '' }
+        return {
+          variable,
+          mode: binding.mode,
+          column: binding.mode === 'column' ? binding.column : null,
+          value: binding.mode === 'fixed' ? binding.value : null
+        }
+      })
     }
 
     if (attachments.length > 0) {
@@ -494,8 +821,6 @@ export default function SendPage() {
       }
       const data = await resp.json()
       setCurrentJobId(data.job_id)
-      setAppPassword('')
-      setShowPasswordInput(false)
     } catch (err: any) {
       setErrorModal({ title: 'Erro de conexão', message: 'Erro ao conectar com o servidor', details: err?.message || String(err) })
     }
@@ -506,9 +831,32 @@ export default function SendPage() {
     alert('Salvar Lista: configuração pendente. Veja console para payload.')
   }
 
+  const bothChannelsUnavailable = !isEmailEnabled && !isWhatsappEnabled
+
   return (
     <div>
       <h2 className={`text-2xl font-semibold mb-4 ${currentTheme.accent}`}>Enviar Mensagens</h2>
+
+      <div className={`mb-4 p-4 rounded ${currentTheme.bg} border ${currentTheme.border} flex items-end justify-between`}>
+        <div>
+          <div className="text-sm font-medium mb-1">Canal</div>
+          <div className="flex gap-2">
+            <label className={`btn ${channel === 'whatsapp' ? 'btn-success' : 'btn-ghost'} ${!isWhatsappEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input className="hidden" type="radio" name="channel" checked={channel === 'whatsapp'} disabled={!isWhatsappEnabled} onChange={() => setChannel('whatsapp')} /> WhatsApp
+            </label>
+            <label className={`btn ${channel === 'email' ? 'btn-danger' : 'btn-ghost'} ${!isEmailEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input className="hidden" type="radio" name="channel" checked={channel === 'email'} disabled={!isEmailEnabled} onChange={() => setChannel('email')} /> Email
+            </label>
+          </div>
+          {bothChannelsUnavailable && (
+            <div className="mt-3">
+              <button type="button" className="btn btn-primary" onClick={() => onNavigate?.('account')}>
+                Configurar remetente
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       <FileUploadSection
         theme={currentTheme}
@@ -554,6 +902,18 @@ export default function SendPage() {
         onRemoveColumn={removeColumn}
       />
 
+      <ContactChannelSection
+        channel={channel}
+        headers={headers}
+        phoneColumn={phoneColumn}
+        emailColumn={emailColumn}
+        showSendButton={false}
+        theme={currentTheme}
+        onPhoneColumnChange={setPhoneColumn}
+        onEmailColumnChange={setEmailColumn}
+        onSend={handleSend}
+      />
+
       <AttachmentsSection
         attachments={attachments}
         headers={headers}
@@ -567,31 +927,207 @@ export default function SendPage() {
         onMatchModeChange={setMatchMode}
       />
 
+      <div className={`mb-4 p-4 rounded ${currentTheme.bg} border ${currentTheme.border} space-y-3`}>
+        <h3 className="font-medium">Template de Mensagem</h3>
+
+        {channel === 'email' && (
+          <div className="space-y-3">
+            <div>
+              <div className="text-sm font-medium mb-1">Remetente cadastrado</div>
+              <select
+                value={selectedEmailSender}
+                onChange={e => {
+                  setSelectedEmailSender(e.target.value)
+                  setSelectedEmailTemplateTitle('')
+                }}
+                className="input w-full"
+              >
+                <option value="">Selecione um remetente cadastrado...</option>
+                {accountSettings.gmailSenders.map(sender => (
+                  <option key={sender.id} value={sender.senderEmail}>{sender.senderEmail}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="text-sm font-medium mb-1">Template de Email</div>
+              <select
+                value={selectedEmailTemplateTitle}
+                onChange={e => setSelectedEmailTemplateTitle(e.target.value)}
+                className="input w-full"
+              >
+                <option value="">Selecione a template...</option>
+                {emailTemplates.map(template => (
+                  <option key={template.title} value={template.title}>{template.title}</option>
+                ))}
+              </select>
+              <div className="text-xs text-slate-500 mt-1">
+                Ao selecionar, assunto e mensagem serão preenchidos automaticamente.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {channel === 'whatsapp' && (
+          <div className="space-y-3">
+            <div>
+              <div className="text-sm font-medium mb-1">Remetente WhatsApp</div>
+              <select
+                value={selectedWhatsappSenderId}
+                onChange={e => {
+                  setSelectedWhatsappSenderId(e.target.value)
+                  setSelectedWhatsappTemplateTitle('')
+                  setWhatsappVariableBindings({})
+                }}
+                className="input w-full"
+              >
+                <option value="">Selecione um remetente...</option>
+                {accountSettings.whatsappSenders.map(sender => (
+                  <option key={sender.id} value={sender.id}>{sender.phoneNumber}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="text-sm font-medium mb-1">Template WhatsApp</div>
+              <select
+                value={selectedWhatsappTemplateTitle}
+                onChange={e => setSelectedWhatsappTemplateTitle(e.target.value)}
+                className="input w-full"
+              >
+                <option value="">Selecione a template...</option>
+                {whatsappTemplates.map(template => (
+                  <option key={template.title} value={template.title}>{template.title}</option>
+                ))}
+              </select>
+              <div className="text-xs text-slate-500 mt-1">
+                As variáveis serão exibidas após selecionar uma template.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {channel === 'email' && (
+        <div className={`mb-4 p-4 rounded ${currentTheme.bg} border ${currentTheme.border}`}>
+          <h3 className="font-medium mb-2">Assunto</h3>
+          <input
+            type="text"
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            className="input w-full"
+            placeholder="Digite o assunto do email"
+          />
+        </div>
+      )}
+
       <MessageSection
         headers={headers}
         message={message}
+        readOnly={channel === 'whatsapp'}
+        readOnlyHint={channel === 'whatsapp' ? 'Para WhatsApp, selecione a template e configure as variáveis abaixo.' : ''}
         theme={currentTheme}
         onMessageChange={setMessage}
         onInsertPlaceholder={insertPlaceholder}
       />
+
+      {channel === 'whatsapp' && (
+        <div className={`mb-4 p-4 rounded ${currentTheme.bg} border ${currentTheme.border} space-y-3`}>
+          <h3 className="font-medium">Variáveis da template WhatsApp</h3>
+
+          {!selectedWhatsappTemplate ? (
+            <p className="text-sm text-slate-500">Selecione uma template na seção de canal para configurar variáveis.</p>
+          ) : whatsappTemplateVariables.length === 0 ? (
+            <p className="text-sm text-slate-500">A template selecionada não possui variáveis.</p>
+          ) : (
+            <div className="space-y-3">
+              {whatsappTemplateVariables.map(variable => {
+                const binding = whatsappVariableBindings[variable] || { mode: 'column' as const, column: '', value: '' }
+                return (
+                  <div key={variable} className="rounded border border-green-200 bg-white p-3">
+                    <div className="text-sm font-medium text-slate-800 mb-2">{`{${variable}}`}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <select
+                        value={binding.mode}
+                        onChange={e => {
+                          const mode = e.target.value as 'column' | 'fixed'
+                          setWhatsappVariableBindings(prev => ({
+                            ...prev,
+                            [variable]: {
+                              ...prev[variable],
+                              mode,
+                              column: mode === 'column' ? prev[variable]?.column || '' : '',
+                              value: mode === 'fixed' ? prev[variable]?.value || '' : ''
+                            }
+                          }))
+                        }}
+                        className="input"
+                      >
+                        <option value="column">Vincular com coluna</option>
+                        <option value="fixed">Valor fixo</option>
+                      </select>
+
+                      {binding.mode === 'column' ? (
+                        <select
+                          value={binding.column}
+                          onChange={e => {
+                            const column = e.target.value
+                            setWhatsappVariableBindings(prev => ({
+                              ...prev,
+                              [variable]: {
+                                ...prev[variable],
+                                mode: 'column',
+                                column
+                              }
+                            }))
+                          }}
+                          className="input md:col-span-2"
+                        >
+                          <option value="">Selecione a coluna</option>
+                          {headers.map(header => (
+                            <option key={header} value={header}>{header}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={binding.value}
+                          onChange={e => {
+                            const value = e.target.value
+                            setWhatsappVariableBindings(prev => ({
+                              ...prev,
+                              [variable]: {
+                                ...prev[variable],
+                                mode: 'fixed',
+                                value
+                              }
+                            }))
+                          }}
+                          placeholder="Digite o valor fixo"
+                          className="input md:col-span-2"
+                        />
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      
 
       <ContactChannelSection
         channel={channel}
         headers={headers}
         phoneColumn={phoneColumn}
         emailColumn={emailColumn}
-        senderId={senderId}
-        appPassword={appPassword}
-        subject={subject}
-        showPasswordInput={showPasswordInput}
+        showColumnSelector={false}
+        isSendDisabled={channel === 'none'}
         theme={currentTheme}
         onPhoneColumnChange={setPhoneColumn}
         onEmailColumnChange={setEmailColumn}
-        onSenderIdChange={setSenderId}
-        onAppPasswordChange={setAppPassword}
-        onSubjectChange={setSubject}
-        onTogglePasswordVisibility={() => setShowPasswordInput(!showPasswordInput)}
-        onChannelChange={setChannel}
         onSend={handleSend}
       />
 

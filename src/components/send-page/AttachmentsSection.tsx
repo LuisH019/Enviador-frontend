@@ -77,96 +77,92 @@ export function AttachmentsSection({
       </div>
 
       {attachments.length > 0 && (
-        <div className="mt-4">
-          <div className="text-sm font-medium mb-1">Anexos</div>
-          <ul className="text-sm">
-            {attachments.map((f, idx) => (
-              <li key={idx} className="flex items-center justify-between py-1">
-                <span>{f.name} ({formatBytes(f.size)})</span>
-                <div className="flex gap-2">
-                  <button onClick={() => onRemoveFile(idx)} className="text-xs text-red-600 hover:underline">Remover</button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="mt-4 rounded">
-        <div className="text-sm font-medium mb-2">Vincular arquivos à:</div>
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <select value={fileColumn} onChange={e => onFileColumnChange(e.target.value)} className="input w-full">
-              <option value="">Nenhuma coluna (enviar os mesmos para todos)</option>
-              {headers.map(h => <option key={h} value={h}>{h}</option>)}
-            </select>
+        <>
+          <div className="mt-4">
+            <div className="text-sm font-medium mb-1">Anexos</div>
+            <ul className="text-sm">
+              {attachments.map((f, idx) => (
+                <li key={idx} className="flex items-center justify-between py-1">
+                  <span>{f.name} ({formatBytes(f.size)})</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => onRemoveFile(idx)} className="text-xs text-red-600 hover:underline">Remover</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
 
-        {/* <div className="text-xs text-slate-500 mt-2">
-          Se selecionar uma coluna, cada destinatário receberá apenas os anexos cujo nome coincida com o valor da coluna. Ex: coluna "Arquivo" com valor "fatura.pdf" enviará apenas fatura.pdf.
-        </div>
-         */}
-
-         <div className='mt-4'>
-            <div className="text-sm font-medium mb-2">Opções de vinculação:</div>
-
-            <div className='flex items-end justify-between'>
-                <div className='flex items-center'>
-                    <input 
-                      id="igual" 
-                      type="radio" 
-                      name="match-mode"
-                      value="igual" 
-                      checked={matchMode === 'igual'}
-                      onChange={e => onMatchModeChange(e.target.value as any)}
-                      className={`border-2 ${theme.border} ${radioStyle}`} 
-                    />
-                    <label htmlFor="igual" className="select-none ms-2 text-xs font-medium text-heading">Igual à coluna selecionada</label>
-                </div>
-
-                <div className='flex items-center'>
-                    <input 
-                      id="contem" 
-                      type="radio" 
-                      name="match-mode"
-                      value="contem" 
-                      checked={matchMode === 'contem'}
-                      onChange={e => onMatchModeChange(e.target.value as any)}
-                      className={`border-2 ${theme.border} ${radioStyle}`}
-                    />
-                    <label htmlFor="contem" className="select-none ms-2 text-xs font-medium text-heading">Contém a coluna selecionada</label>
-                </div>
-
-                <div className='flex items-center'>
-                    <input 
-                      id="comeca_com" 
-                      type="radio" 
-                      name="match-mode"
-                      value="comeca_com" 
-                      checked={matchMode === 'comeca_com'}
-                      onChange={e => onMatchModeChange(e.target.value as any)}
-                      className={`border-2 ${theme.border} ${radioStyle}`}
-                    />
-                    <label htmlFor="comeca_com" className="select-none ms-2 text-xs font-medium text-heading">Começa com a coluna selecionada</label>
-                </div>
-
-                <div className='flex items-center'>
-                    <input 
-                      id="termina_com" 
-                      type="radio" 
-                      name="match-mode"
-                      value="termina_com" 
-                      checked={matchMode === 'termina_com'}
-                      onChange={e => onMatchModeChange(e.target.value as any)}
-                      className={`border-2 ${theme.border} ${radioStyle}`}
-                    />
-                    <label htmlFor="termina_com" className="select-none ms-2 text-xs font-medium text-heading">Termina com a coluna selecionada</label>
-                </div>
+          <div className="mt-4 rounded">
+            <div className="text-sm font-medium mb-2">Vincular arquivos à:</div>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <select value={fileColumn} onChange={e => onFileColumnChange(e.target.value)} className="input w-full">
+                  <option value="">Nenhuma coluna (enviar os mesmos para todos)</option>
+                  {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </div>
             </div>
-         </div>
-         
-      </div>
+
+            <div className='mt-4'>
+              <div className="text-sm font-medium mb-2">Opções de vinculação:</div>
+
+              <div className='flex items-end justify-between'>
+                <div className='flex items-center'>
+                  <input 
+                    id="igual" 
+                    type="radio" 
+                    name="match-mode"
+                    value="igual" 
+                    checked={matchMode === 'igual'}
+                    onChange={e => onMatchModeChange(e.target.value as any)}
+                    className={`border-2 ${theme.border} ${radioStyle}`} 
+                  />
+                  <label htmlFor="igual" className="select-none ms-2 text-xs font-medium text-heading">Igual à coluna selecionada</label>
+                </div>
+
+                <div className='flex items-center'>
+                  <input 
+                    id="contem" 
+                    type="radio" 
+                    name="match-mode"
+                    value="contem" 
+                    checked={matchMode === 'contem'}
+                    onChange={e => onMatchModeChange(e.target.value as any)}
+                    className={`border-2 ${theme.border} ${radioStyle}`}
+                  />
+                  <label htmlFor="contem" className="select-none ms-2 text-xs font-medium text-heading">Contém a coluna selecionada</label>
+                </div>
+
+                <div className='flex items-center'>
+                  <input 
+                    id="comeca_com" 
+                    type="radio" 
+                    name="match-mode"
+                    value="comeca_com" 
+                    checked={matchMode === 'comeca_com'}
+                    onChange={e => onMatchModeChange(e.target.value as any)}
+                    className={`border-2 ${theme.border} ${radioStyle}`}
+                  />
+                  <label htmlFor="comeca_com" className="select-none ms-2 text-xs font-medium text-heading">Começa com a coluna selecionada</label>
+                </div>
+
+                <div className='flex items-center'>
+                  <input 
+                    id="termina_com" 
+                    type="radio" 
+                    name="match-mode"
+                    value="termina_com" 
+                    checked={matchMode === 'termina_com'}
+                    onChange={e => onMatchModeChange(e.target.value as any)}
+                    className={`border-2 ${theme.border} ${radioStyle}`}
+                  />
+                  <label htmlFor="termina_com" className="select-none ms-2 text-xs font-medium text-heading">Termina com a coluna selecionada</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <style>{`
         input[type='radio'][class*='w-4']:checked {

@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 
 type HeaderProps = {
-  onNavigate?: (page: 'home' | 'send' | 'docs' | 'contact' | 'login' | 'signup') => void
-  currentPage?: 'home' | 'send' | 'docs' | 'contact' | 'login' | 'signup'
+  onNavigate?: (page: 'home' | 'send' | 'account' | 'contact' | 'login' | 'signup') => void
+  currentPage?: 'home' | 'send' | 'account' | 'contact' | 'login' | 'signup'
 }
 
 export default function Header({ onNavigate, currentPage = 'home' }: HeaderProps) {
@@ -15,7 +15,7 @@ export default function Header({ onNavigate, currentPage = 'home' }: HeaderProps
   const navItems = [
     { key: 'home', label: 'Início' },
     { key: 'send', label: 'Enviar' },
-    { key: 'docs', label: 'Recursos' },
+    { key: 'account', label: 'Conta' },
     { key: 'contact', label: 'Contato' }
   ] as const
 

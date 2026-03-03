@@ -21,12 +21,19 @@ interface Props {
 export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue, onCancel }: Props) {
   if (!show) return null
 
+  const hasSummaryItems =
+    warnings.unusedFiles.length > 0 ||
+    warnings.recipientsWithoutFile.length > 0 ||
+    warnings.missingFilesForRecipients.length > 0 ||
+    warnings.recipientsWithMultipleAttachments.length > 0 ||
+    warnings.attachmentsSentToMultiple.length > 0 ||
+    warnings.bulkWarning
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center gap-2 mb-6">
-          <span className="text-3xl">👁️</span>
-          <h3 className="text-2xl font-bold">Prévia de Envio de Anexos</h3>
+          <h3 className="text-2xl font-bold">Prévia de Envio de Mensagens</h3>
         </div>
 
         <div className="space-y-4">
@@ -34,7 +41,6 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
           {warnings.unusedFiles.length > 0 && (
             <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">📄</span>
                 <div className="font-bold text-yellow-900">
                   Arquivos não utilizados ({warnings.unusedFiles.length})
                 </div>
@@ -59,7 +65,6 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
           {warnings.recipientsWithoutFile.length > 0 && (
             <div className="p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">👤</span>
                 <div className="font-bold text-blue-900">
                   Destinatários sem arquivo ({warnings.recipientsWithoutFile.length})
                 </div>
@@ -92,7 +97,6 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
           {warnings.missingFilesForRecipients.length > 0 && (
             <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">🔴</span>
                 <div className="font-bold text-red-900">
                   Arquivo(s) não encontrado(s) ({warnings.missingFilesForRecipients.length})
                 </div>
@@ -125,7 +129,6 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
           {warnings.recipientsWithMultipleAttachments.length > 0 && (
             <div className="p-4 bg-purple-50 border-l-4 border-purple-400 rounded">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">📎</span>
                 <div className="font-bold text-purple-900">
                   Destinatários com múltiplos anexos ({warnings.recipientsWithMultipleAttachments.length})
                 </div>
@@ -158,7 +161,6 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
           {warnings.attachmentsSentToMultiple.length > 0 && (
             <div className="p-4 bg-indigo-50 border-l-4 border-indigo-400 rounded">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">🔄</span>
                 <div className="font-bold text-indigo-900">
                   Anexos compartilhados ({warnings.attachmentsSentToMultiple.length})
                 </div>
@@ -191,7 +193,6 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
           {warnings.bulkWarning && (
             <div className="p-4 bg-orange-50 border-l-4 border-orange-400 rounded">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl">📦</span>
                 <div className="font-bold text-orange-900">
                   Envio em massa detectado
                 </div>
@@ -206,7 +207,6 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
           {/* Prévia de anexos */}
           <div className="p-4 bg-green-50 border-l-4 border-green-400 rounded">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">👁️</span>
               <div className="font-bold text-green-900">
                 Prévia de envio ({warnings.attachmentPreview.length} destinatários)
               </div>
@@ -221,7 +221,9 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
                     <span className="text-green-600 mt-0.5">→</span>
                     <span>
                       <span className="font-medium">{item.contact}</span>
-                      <span className="text-green-600"> ({item.attachments.length} anexo{item.attachments.length !== 1 ? 's' : ''}: {item.attachments.join(', ')})</span>
+                      {item.attachments.length > 0 && (
+                        <span className="text-green-600"> ({item.attachments.length} anexo{item.attachments.length !== 1 ? 's' : ''}: {item.attachments.join(', ')})</span>
+                      )}
                     </span>
                   </li>
                 ))}
@@ -237,29 +239,31 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
         </div>
 
         {/* Resumo */}
-        <div className="mt-6 p-4 bg-gray-50 rounded border border-gray-200">
-          <div className="font-semibold text-gray-900 mb-2">📊 Resumo:</div>
-          <div className="text-sm text-gray-700 space-y-1">
-            {warnings.unusedFiles.length > 0 && (
-              <div>• {warnings.unusedFiles.length} arquivo(s) não será(ão) enviado(s)</div>
-            )}
-            {warnings.recipientsWithoutFile.length > 0 && (
-              <div>• {warnings.recipientsWithoutFile.length} destinatário(s) sem anexo</div>
-            )}
-            {warnings.missingFilesForRecipients.length > 0 && (
-              <div>• {warnings.missingFilesForRecipients.length} destinatário(s) com arquivo(s) faltando</div>
-            )}
-            {warnings.recipientsWithMultipleAttachments.length > 0 && (
-              <div>• {warnings.recipientsWithMultipleAttachments.length} destinatário(s) com múltiplos anexos</div>
-            )}
-            {warnings.attachmentsSentToMultiple.length > 0 && (
-              <div>• {warnings.attachmentsSentToMultiple.length} anexo(s) compartilhado(s)</div>
-            )}
-            {warnings.bulkWarning && (
-              <div>• Envio em massa: {warnings.attachmentPreview[0]?.attachments.length || 0} anexo(s) para {warnings.attachmentPreview.length} destinatários</div>
-            )}
+        {hasSummaryItems && (
+          <div className="mt-6 p-4 bg-gray-50 rounded border border-gray-200">
+            <div className="font-semibold text-gray-900 mb-2">Resumo:</div>
+            <div className="text-sm text-gray-700 space-y-1">
+              {warnings.unusedFiles.length > 0 && (
+                <div>• {warnings.unusedFiles.length} arquivo(s) não será(ão) enviado(s)</div>
+              )}
+              {warnings.recipientsWithoutFile.length > 0 && (
+                <div>• {warnings.recipientsWithoutFile.length} destinatário(s) sem anexo</div>
+              )}
+              {warnings.missingFilesForRecipients.length > 0 && (
+                <div>• {warnings.missingFilesForRecipients.length} destinatário(s) com arquivo(s) faltando</div>
+              )}
+              {warnings.recipientsWithMultipleAttachments.length > 0 && (
+                <div>• {warnings.recipientsWithMultipleAttachments.length} destinatário(s) com múltiplos anexos</div>
+              )}
+              {warnings.attachmentsSentToMultiple.length > 0 && (
+                <div>• {warnings.attachmentsSentToMultiple.length} anexo(s) compartilhado(s)</div>
+              )}
+              {warnings.bulkWarning && (
+                <div>• Envio em massa: {warnings.attachmentPreview[0]?.attachments.length || 0} anexo(s) para {warnings.attachmentPreview.length} destinatários</div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Botões */}
         <div className="mt-6 flex gap-3">

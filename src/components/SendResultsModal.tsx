@@ -129,7 +129,7 @@ export default function SendResultsModal({ job, onClose }: Props) {
             }}
             className="flex-1 btn btn-sm btn-outline"
           >
-            📥 CSV
+            Download CSV
           </button>
           <button
             onClick={() => onClose && onClose()}

@@ -1,6 +1,6 @@
 import React from 'react'
 
-type HomeProps = { onNavigate?: (page: 'home' | 'send' | 'docs' | 'contact') => void }
+type HomeProps = { onNavigate?: (page: 'home' | 'send' | 'account' | 'contact') => void }
 
 export default function Home({ onNavigate }: HomeProps) {
   return (

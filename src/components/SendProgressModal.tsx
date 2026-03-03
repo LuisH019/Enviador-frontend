@@ -52,7 +52,7 @@ export default function SendProgressModal({ jobId, token, onClose }: Props) {
                     {it.status === 'success' ? (
                       <span className="text-xs">✓</span>
                     ) : it.status === 'failed' ? (
-                      <span className="text-lg">❌</span>
+                      <span className="text-lg">X</span>
                     ) : (
                       <span>...</span>
                     )}

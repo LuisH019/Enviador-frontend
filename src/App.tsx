@@ -7,9 +7,10 @@ import SendPage from './components/SendPage'
 import { LoginPage } from './components/LoginPage'
 import { SignupPage } from './components/SignupPage'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import AccountPage from './components/AccountPage'
 
 export default function App() {
-  const [page, setPage] = useState<'home' | 'send' | 'docs' | 'contact' | 'login' | 'signup'>('home')
+  const [page, setPage] = useState<'home' | 'send' | 'account' | 'contact' | 'login' | 'signup'>('home')
 
   // Pages that don't require authentication
   const publicPages = ['home', 'login', 'signup']
@@ -28,12 +29,12 @@ export default function App() {
         {page === 'signup' && <SignupPage onNavigate={setPage} />}
         {page === 'send' && (
           <ProtectedRoute onNavigate={setPage}>
-            <SendPage />
+            <SendPage onNavigate={setPage} />
           </ProtectedRoute>
         )}
-        {page === 'docs' && (
+        {page === 'account' && (
           <ProtectedRoute onNavigate={setPage}>
-            <div>Recursos / Documentação (em breve)</div>
+            <AccountPage />
           </ProtectedRoute>
         )}
         {page === 'contact' && (
