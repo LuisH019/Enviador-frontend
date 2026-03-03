@@ -7,6 +7,8 @@ interface PreviewWarnings {
   recipientsWithMultipleAttachments: Array<{ index: number; attachments: string[]; contact: string }>
   attachmentsSentToMultiple: Array<{ fileName: string; recipients: Array<{ index: number; contact: string }> }>
   attachmentPreview: Array<{ index: number; contact: string; attachments: string[] }>
+  removedDuplicateEmails: string[]
+  removedDuplicateCount: number
   bulkWarning: boolean
 }
 
@@ -37,6 +39,36 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
         </div>
 
         <div className="space-y-4">
+          {/* Emails duplicados removidos */}
+          {warnings.removedDuplicateCount > 0 && (
+            <div className="p-4 bg-amber-50 border-l-4 border-amber-400 rounded">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">✂️</span>
+                <div className="font-bold text-amber-900">
+                  Emails duplicados removidos ({warnings.removedDuplicateCount})
+                </div>
+              </div>
+              <p className="text-sm text-amber-700 mb-3">
+                Foram removidos os seguintes emails duplicados e apenas a primeira ocorrência de cada um será enviada:
+              </p>
+              <div className="bg-white rounded p-3 max-h-40 overflow-y-auto">
+                <ul className="space-y-2">
+                  {warnings.removedDuplicateEmails.slice(0, 20).map((email, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-amber-800">
+                      <span className="text-amber-600 mt-0.5">→</span>
+                      <span>{email}</span>
+                    </li>
+                  ))}
+                  {warnings.removedDuplicateEmails.length > 20 && (
+                    <li className="text-sm text-amber-600 italic">
+                      ... e mais {warnings.removedDuplicateEmails.length - 20} email(s)
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          )}
+
           {/* Arquivos não utilizados */}
           {warnings.unusedFiles.length > 0 && (
             <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded">
@@ -243,6 +275,9 @@ export function AttachmentWarningsModal({ show, warnings, fileColumn, onContinue
           <div className="mt-6 p-4 bg-gray-50 rounded border border-gray-200">
             <div className="font-semibold text-gray-900 mb-2">Resumo:</div>
             <div className="text-sm text-gray-700 space-y-1">
+            {warnings.removedDuplicateCount > 0 && (
+              <div>• {warnings.removedDuplicateCount} ocorrência(s) de email duplicado removida(s)</div>
+            )}
               {warnings.unusedFiles.length > 0 && (
                 <div>• {warnings.unusedFiles.length} arquivo(s) não será(ão) enviado(s)</div>
               )}

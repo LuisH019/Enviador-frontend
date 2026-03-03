@@ -89,6 +89,7 @@ export default function SendPage({ onNavigate }: SendPageProps) {
   // Data state
   const [headers, setHeaders] = useState<string[]>([])
   const [rows, setRows] = useState<Row[]>([])
+  const [rowsToSend, setRowsToSend] = useState<Row[]>([])
   
   // Channel & configuration
   const [channel, setChannel] = useState<'whatsapp' | 'email' | 'none'>('none')
@@ -135,6 +136,8 @@ export default function SendPage({ onNavigate }: SendPageProps) {
     recipientsWithMultipleAttachments: Array<{ index: number; attachments: string[]; contact: string }>
     attachmentsSentToMultiple: Array<{ fileName: string; recipients: Array<{ index: number; contact: string }> }>
     attachmentPreview: Array<{ index: number; contact: string; attachments: string[] }>
+    removedDuplicateEmails: string[]
+    removedDuplicateCount: number
     bulkWarning: boolean
   }>({
     unusedFiles: [],
@@ -143,6 +146,8 @@ export default function SendPage({ onNavigate }: SendPageProps) {
     recipientsWithMultipleAttachments: [],
     attachmentsSentToMultiple: [],
     attachmentPreview: [],
+    removedDuplicateEmails: [],
+    removedDuplicateCount: 0,
     bulkWarning: false
   })
 
@@ -579,6 +584,8 @@ export default function SendPage({ onNavigate }: SendPageProps) {
       return
     }
 
+    setRowsToSend([])
+
     if (rows.length === 0) {
       setErrorModal({ title: 'Sem dados', message: 'Nenhum destinatário carregado.' })
       return
@@ -636,7 +643,38 @@ export default function SendPage({ onNavigate }: SendPageProps) {
       return
     }
 
-    const invalid = rows.filter(r => !(r[contactColumn] && r[contactColumn].trim()))
+    let filteredRows = rows
+    let removedDuplicateCount = 0
+    let removedDuplicateEmails: string[] = []
+
+    if (channel === 'email') {
+      const seenEmails = new Set<string>()
+      const duplicates = new Set<string>()
+      const uniqueRows: Row[] = []
+
+      for (const row of rows) {
+        const rawEmail = (row[contactColumn] || '').trim()
+        if (!rawEmail) {
+          uniqueRows.push(row)
+          continue
+        }
+
+        const normalizedEmail = rawEmail.toLowerCase()
+        if (seenEmails.has(normalizedEmail)) {
+          removedDuplicateCount += 1
+          duplicates.add(rawEmail)
+          continue
+        }
+
+        seenEmails.add(normalizedEmail)
+        uniqueRows.push(row)
+      }
+
+      filteredRows = uniqueRows
+      removedDuplicateEmails = Array.from(duplicates)
+    }
+    
+    const invalid = filteredRows.filter(r => !(r[contactColumn] && r[contactColumn].trim()))
     if (invalid.length > 0) {
       if (!confirm(`${invalid.length} linhas sem ${channel === 'whatsapp' ? 'número' : 'email'}. Continuar mesmo assim?`)) return
     }
@@ -689,7 +727,7 @@ export default function SendPage({ onNavigate }: SendPageProps) {
       const recipientAttachments: Map<number, string[]> = new Map()
       const attachmentRecipients: Map<string, Array<{index: number, contact: string}>> = new Map()
       
-      rows.forEach((row, index) => {
+      filteredRows.forEach((row, index) => {
         const fileNameValue = (row[fileColumn] || '').trim()
         const contact = row[contactColumn] || `Linha ${index + 1}`
         
@@ -730,7 +768,7 @@ export default function SendPage({ onNavigate }: SendPageProps) {
         .map(([index, atts]) => ({
           index,
           attachments: atts,
-          contact: rows[index][contactColumn] || `Linha ${index + 1}`
+          contact: filteredRows[index][contactColumn] || `Linha ${index + 1}`
         }))
       
       attachmentsSentToMultiple = Array.from(attachmentRecipients.entries())
@@ -738,13 +776,15 @@ export default function SendPage({ onNavigate }: SendPageProps) {
         .map(([fileName, recs]) => ({ fileName, recipients: recs }))
     } else {
       // Para attachToAll, todos os destinatários recebem todos os anexos
-      attachmentPreview = rows.map((row, index) => ({
+      attachmentPreview = filteredRows.map((row, index) => ({
         index,
         contact: row[contactColumn] || `Linha ${index + 1}`,
         attachments: attachments.map(f => f.name)
       }))
-      bulkWarning = attachments.length > 1 && rows.length > 10
+      bulkWarning = attachments.length > 1 && filteredRows.length > 10
     }
+
+    setRowsToSend(filteredRows)
 
     // Sempre mostrar a prévia
     setPreviewWarnings({
@@ -754,6 +794,8 @@ export default function SendPage({ onNavigate }: SendPageProps) {
       recipientsWithMultipleAttachments,
       attachmentsSentToMultiple,
       attachmentPreview,
+      removedDuplicateEmails,
+      removedDuplicateCount,
       bulkWarning
     })
     setShowAttachmentPreview(true)
@@ -765,7 +807,7 @@ export default function SendPage({ onNavigate }: SendPageProps) {
     const payload: any = {
       channel,
       message,
-      rows,
+      rows: rowsToSend.length > 0 ? rowsToSend : rows,
       contact_column: contactColumn,
       file_column: fileColumn || null,
       attach_to_all: !fileColumn,
