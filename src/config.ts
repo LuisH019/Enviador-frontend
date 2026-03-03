@@ -9,12 +9,12 @@ export const config = {
    * Em desenvolvimento: http://localhost:8000
    * Em produção: use VITE_API_URL no .env.production
    */
-  API_URL: 'http://localhost:8000',
+  API_URL: (import.meta.env.VITE_API_URL || 'https://enviador-backend-ca2c88a2ae88.herokuapp.com').replace(/\/$/, ''),
 
   /**
    * Endpoint base para requisições da API
    */
-  API_BASE: 'http://localhost:8000/api',
+  API_BASE: `${(import.meta.env.VITE_API_URL || 'https://enviador-backend-ca2c88a2ae88.herokuapp.com').replace(/\/$/, '')}/api`,
 };
 
 export default config;
