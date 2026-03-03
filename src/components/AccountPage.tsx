@@ -186,6 +186,11 @@ export default function AccountPage() {
       return
     }
 
+    if (!gmailEmailInput.trim() || !gmailPasswordInput.trim()) {
+      setApiMessage('Informe email e senha de app para salvar o remetente Gmail.')
+      return
+    }
+
     const nextSender: GmailSenderCard = {
       id: editingGmailSenderId || crypto.randomUUID(),
       senderEmail: gmailEmailInput.trim(),

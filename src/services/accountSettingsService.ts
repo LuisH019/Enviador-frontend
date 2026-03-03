@@ -30,9 +30,16 @@ function toAccountSettings(data: AccountSettingsApiResponse, base?: AccountSetti
   const camelWhatsapp = data.whatsapp || {}
   const current = base || loadAccountSettings()
 
+  const nextGmailEmail = (data.gmail_sender_email ?? camelGmail.senderEmail ?? current.gmail.senderEmail).trim()
+  const existingGmailSender = current.gmailSenders.find(sender => sender.senderEmail === nextGmailEmail)
+
   const nextGmail: GmailSettings = {
-    senderEmail: (data.gmail_sender_email ?? camelGmail.senderEmail ?? current.gmail.senderEmail).trim(),
-    appPassword: data.gmail_app_password ?? camelGmail.appPassword ?? current.gmail.appPassword
+    senderEmail: nextGmailEmail,
+    appPassword:
+      data.gmail_app_password ??
+      camelGmail.appPassword ??
+      existingGmailSender?.appPassword ??
+      (current.gmail.senderEmail === nextGmailEmail ? current.gmail.appPassword : '')
   }
 
   const currentGmailSenders = current.gmailSenders || []
@@ -40,7 +47,7 @@ function toAccountSettings(data: AccountSettingsApiResponse, base?: AccountSetti
   const gmailSenders = [...currentGmailSenders]
   if (gmailActiveIndex >= 0) {
     gmailSenders[gmailActiveIndex] = { ...gmailSenders[gmailActiveIndex], ...nextGmail }
-  } else if (nextGmail.senderEmail || nextGmail.appPassword) {
+  } else if (nextGmail.senderEmail && nextGmail.appPassword) {
     gmailSenders.unshift({
       id: `active-gmail-${nextGmail.senderEmail || Date.now()}`,
       ...nextGmail,

@@ -41,7 +41,7 @@ function sanitizeGmailSenderCard(card: LooseGmailSenderCard): GmailSenderCard | 
   const senderEmail = card.senderEmail?.trim() || ''
   const appPassword = card.appPassword || ''
 
-  if (!senderEmail && !appPassword) return null
+  if (!senderEmail || !appPassword) return null
 
   return {
     id: card.id?.trim() || `${senderEmail || 'gmail'}-${Date.now()}`,
@@ -57,12 +57,16 @@ function sanitizeGmailSenders(cards: Array<Partial<GmailSenderCard>> | undefined
     .map(sanitizeGmailSenderCard)
     .filter((card): card is GmailSenderCard => Boolean(card))
 
-  const hasActive = normalized.some(card => card.senderEmail === fallback.senderEmail)
-  if (!hasActive) {
+  const fallbackEmail = fallback.senderEmail.trim()
+  const fallbackPassword = fallback.appPassword
+  const canUseFallback = Boolean(fallbackEmail && fallbackPassword)
+
+  const hasActive = normalized.some(card => card.senderEmail === fallbackEmail)
+  if (canUseFallback && !hasActive) {
     const active = sanitizeGmailSenderCard({
-      id: `active-gmail-${fallback.senderEmail || Date.now()}`,
-      senderEmail: fallback.senderEmail,
-      appPassword: fallback.appPassword,
+      id: `active-gmail-${fallbackEmail || Date.now()}`,
+      senderEmail: fallbackEmail,
+      appPassword: fallbackPassword,
       templates: []
     })
     if (active) normalized.unshift(active)
