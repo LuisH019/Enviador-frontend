@@ -1,4 +1,5 @@
 import React from 'react'
+import RichTextInput from '../RichTextInput'
 
 interface Props {
   headers: string[]
@@ -34,12 +35,12 @@ export function MessageSection({ headers, message, readOnly = false, readOnlyHin
       {readOnly && readOnlyHint && (
         <p className="text-xs text-slate-500 mb-2">{readOnlyHint}</p>
       )}
-      <textarea 
-        value={message} 
-        onChange={e => onMessageChange(e.target.value)} 
-        rows={4} 
-        className="input w-full"
+      <RichTextInput
+        value={message}
+        onChange={onMessageChange}
         readOnly={readOnly}
+        placeholder="Digite ou cole aqui um texto formatado (ex.: negrito, itálico, listas)..."
+        minHeightClassName="min-h-[120px]"
       />
     </div>
   )

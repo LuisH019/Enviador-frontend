@@ -3,6 +3,7 @@ import { AccountSettings, GmailSenderCard, WhatsAppSenderCard } from '../types/a
 import { getWhatsAppConfigStatus, saveAccountSettings } from '../utils/accountSettingsStorage'
 import { accountSettingsService } from '../services/accountSettingsService'
 import { useAuth } from '../hooks/useAuth'
+import RichTextInput from './RichTextInput'
 
 export default function AccountPage() {
   const { token } = useAuth()
@@ -493,7 +494,14 @@ export default function AccountPage() {
                 {channel === 'gmail' && (
                   <p className="mt-2 text-sm text-slate-700"><span className="font-medium">Assunto:</span> {template.subject || 'Sem assunto.'}</p>
                 )}
-                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{template.content || 'Sem conteúdo.'}</p>
+                {template.content ? (
+                  <div
+                    className="mt-2 text-sm text-slate-600 whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ __html: template.content }}
+                  />
+                ) : (
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">Sem conteúdo.</p>
+                )}
                 <button
                   type="button"
                   className="btn btn-ghost mt-2"
@@ -526,12 +534,11 @@ export default function AccountPage() {
                 className="input w-full"
               />
             )}
-            <textarea
+            <RichTextInput
               value={templateContentInput}
-              onChange={(e) => setTemplateContentInput(e.target.value)}
-              placeholder="Conteúdo do template"
-              rows={3}
-              className="input w-full"
+              onChange={setTemplateContentInput}
+              placeholder="Digite ou cole aqui um texto formatado (Ctrl+V com negrito, listas, etc.)"
+              minHeightClassName="min-h-[110px]"
             />
             <button type="button" className="btn btn-primary" onClick={() => handleAddTemplateToSender(channel, senderId)}>
               Salvar template
