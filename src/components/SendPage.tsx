@@ -93,12 +93,12 @@ export default function SendPage({ onNavigate }: SendPageProps) {
   
   // Channel & configuration
   const [channel, setChannel] = useState<'whatsapp' | 'email' | 'none'>('none')
-  const [message, setMessage] = useState<string>(initialDraft?.message || 'Olá {Nome}, este é um teste!')
-  const [subject, setSubject] = useState<string>(initialDraft?.subject || '')
+  const [message, setMessage] = useState<string>('')
+  const [subject, setSubject] = useState<string>('')
   const [selectedEmailSender, setSelectedEmailSender] = useState<string>(initialDraft?.selectedEmailSender || accountSettings.gmail.senderEmail)
-  const [selectedEmailTemplateTitle, setSelectedEmailTemplateTitle] = useState<string>(initialDraft?.selectedEmailTemplateTitle || '')
+  const [selectedEmailTemplateTitle, setSelectedEmailTemplateTitle] = useState<string>('')
   const [selectedWhatsappSenderId, setSelectedWhatsappSenderId] = useState<string>(initialDraft?.selectedWhatsappSenderId || '')
-  const [selectedWhatsappTemplateTitle, setSelectedWhatsappTemplateTitle] = useState<string>(initialDraft?.selectedWhatsappTemplateTitle || '')
+  const [selectedWhatsappTemplateTitle, setSelectedWhatsappTemplateTitle] = useState<string>('')
   const [whatsappVariableBindings, setWhatsappVariableBindings] = useState<Record<string, VariableBinding>>(initialDraft?.whatsappVariableBindings || {})
   
   // Attachments
@@ -208,9 +208,6 @@ export default function SendPage({ onNavigate }: SendPageProps) {
         if (!mounted) return
         setAccountSettings(loaded)
         setSelectedEmailSender(prev => prev || loaded.gmail.senderEmail)
-        const initialEmailSender = loaded.gmailSenders.find(sender => sender.senderEmail === loaded.gmail.senderEmail) || loaded.gmailSenders[0]
-        const initialEmailTemplate = initialEmailSender?.templates?.[0]
-        setSelectedEmailTemplateTitle(prev => prev || initialEmailTemplate?.title || '')
 
         const activeSender = loaded.whatsappSenders.find(sender =>
           sender.phoneNumber === loaded.whatsapp.phoneNumber &&
@@ -218,8 +215,6 @@ export default function SendPage({ onNavigate }: SendPageProps) {
           sender.businessId === loaded.whatsapp.businessId
         )
         setSelectedWhatsappSenderId(prev => prev || activeSender?.id || loaded.whatsappSenders[0]?.id || '')
-        const firstTemplate = activeSender?.templates?.[0]
-        setSelectedWhatsappTemplateTitle(prev => prev || firstTemplate?.title || '')
       })
       .catch(() => {
       })
@@ -280,19 +275,18 @@ export default function SendPage({ onNavigate }: SendPageProps) {
   }, [selectedEmailSender, accountSettings.gmailSenders])
 
   useEffect(() => {
-    if (!selectedEmailTemplateTitle && emailTemplates.length > 0) {
-      setSelectedEmailTemplateTitle(emailTemplates[0].title)
-      return
-    }
-
     const templateExists = emailTemplates.some(template => template.title === selectedEmailTemplateTitle)
-    if (!templateExists) {
-      setSelectedEmailTemplateTitle(emailTemplates[0]?.title || '')
+    if (!templateExists && selectedEmailTemplateTitle) {
+      setSelectedEmailTemplateTitle('')
     }
   }, [selectedEmailTemplateTitle, emailTemplates])
 
   useEffect(() => {
-    if (!selectedEmailTemplate) return
+    if (!selectedEmailTemplate) {
+      setSubject('')
+      setMessage('')
+      return
+    }
 
     setSubject(selectedEmailTemplate.subject || '')
     setMessage(selectedEmailTemplate.content || '')
@@ -325,14 +319,10 @@ export default function SendPage({ onNavigate }: SendPageProps) {
 
   useEffect(() => {
     if (channel !== 'whatsapp') return
-    if (!selectedWhatsappTemplateTitle && whatsappTemplates.length > 0) {
-      setSelectedWhatsappTemplateTitle(whatsappTemplates[0].title)
-      return
-    }
 
     const templateExists = whatsappTemplates.some(template => template.title === selectedWhatsappTemplateTitle)
-    if (!templateExists) {
-      setSelectedWhatsappTemplateTitle(whatsappTemplates[0]?.title || '')
+    if (!templateExists && selectedWhatsappTemplateTitle) {
+      setSelectedWhatsappTemplateTitle('')
     }
   }, [channel, selectedWhatsappTemplateTitle, whatsappTemplates])
 
