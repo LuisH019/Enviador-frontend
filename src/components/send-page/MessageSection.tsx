@@ -39,7 +39,7 @@ export function MessageSection({ headers, message, readOnly = false, readOnlyHin
         value={message}
         onChange={onMessageChange}
         readOnly={readOnly}
-        placeholder="Digite ou cole aqui um texto formatado (ex.: negrito, itálico, listas)..."
+        placeholder="Texto da mensagem."
         minHeightClassName="min-h-[120px]"
       />
     </div>

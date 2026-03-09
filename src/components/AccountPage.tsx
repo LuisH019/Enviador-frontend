@@ -559,7 +559,7 @@ export default function AccountPage() {
             <RichTextInput
               value={templateContentInput}
               onChange={setTemplateContentInput}
-              placeholder="Digite ou cole aqui um texto formatado (Ctrl+V com negrito, listas, etc.)"
+              placeholder="Texto da mensagem."
               minHeightClassName="min-h-[110px]"
             />
             <button type="button" className="btn btn-primary" onClick={() => handleAddTemplateToSender(channel, senderId)}>

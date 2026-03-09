@@ -95,12 +95,6 @@ export default function SendPage({ onNavigate }: SendPageProps) {
   
   // Channel & configuration
   const [channel, setChannel] = useState<'whatsapp' | 'email' | 'none'>('none')
-<<<<<<< Updated upstream
-  const [message, setMessage] = useState<string>(initialDraft?.message || 'Olá {Nome}, este é um teste!')
-  const [subject, setSubject] = useState<string>(initialDraft?.subject || '')
-  const [selectedEmailSender, setSelectedEmailSender] = useState<string>(initialDraft?.selectedEmailSender || accountSettings.gmail.senderEmail)
-  const [selectedEmailTemplateTitle, setSelectedEmailTemplateTitle] = useState<string>(initialDraft?.selectedEmailTemplateTitle || '')
-=======
   const [message, setMessage] = useState<string>('')
   const [subject, setSubject] = useState<string>('')
   const [selectedEmailSender, setSelectedEmailSender] = useState<string>(() => {
@@ -109,7 +103,6 @@ export default function SendPage({ onNavigate }: SendPageProps) {
     return active?.senderEmail || accountSettings.gmailSenders[0]?.senderEmail || ''
   })
   const [selectedEmailTemplateTitle, setSelectedEmailTemplateTitle] = useState<string>('')
->>>>>>> Stashed changes
   const [selectedWhatsappSenderId, setSelectedWhatsappSenderId] = useState<string>(initialDraft?.selectedWhatsappSenderId || '')
   const [selectedWhatsappTemplateTitle, setSelectedWhatsappTemplateTitle] = useState<string>(initialDraft?.selectedWhatsappTemplateTitle || '')
   const [whatsappVariableBindings, setWhatsappVariableBindings] = useState<Record<string, VariableBinding>>(initialDraft?.whatsappVariableBindings || {})
@@ -220,15 +213,8 @@ export default function SendPage({ onNavigate }: SendPageProps) {
       .then((loaded) => {
         if (!mounted) return
         setAccountSettings(loaded)
-<<<<<<< Updated upstream
-        setSelectedEmailSender(prev => prev || loaded.gmail.senderEmail)
-        const initialEmailSender = loaded.gmailSenders.find(sender => sender.senderEmail === loaded.gmail.senderEmail) || loaded.gmailSenders[0]
-        const initialEmailTemplate = initialEmailSender?.templates?.[0]
-        setSelectedEmailTemplateTitle(prev => prev || initialEmailTemplate?.title || '')
-=======
         const activeEmailSender = loaded.gmailSenders.find(sender => sender.id === loaded.activeGmailSenderId)
         const activeSender = loaded.whatsappSenders.find(sender => sender.id === loaded.activeWhatsappSenderId)
->>>>>>> Stashed changes
 
         setSelectedEmailSender(prev => prev || activeEmailSender?.senderEmail || loaded.gmailSenders[0]?.senderEmail || '')
         setSelectedWhatsappSenderId(prev => prev || activeSender?.id || loaded.whatsappSenders[0]?.id || '')
@@ -903,7 +889,7 @@ export default function SendPage({ onNavigate }: SendPageProps) {
             value={subject}
             onChange={e => setSubject(e.target.value)}
             className="input w-full"
-            placeholder="Digite o assunto do email"
+            placeholder="Assunto do email"
           />
         </div>
       )}
