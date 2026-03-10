@@ -28,24 +28,15 @@ export interface WhatsAppSenderCard extends WhatsAppSettings {
 }
 
 export interface AccountSettings {
-  gmail: GmailSettings
   gmailSenders: GmailSenderCard[]
-  whatsapp: WhatsAppSettings
   whatsappSenders: WhatsAppSenderCard[]
+  activeGmailSenderId: string
+  activeWhatsappSenderId: string
 }
 
 export const DEFAULT_ACCOUNT_SETTINGS: AccountSettings = {
-  gmail: {
-    senderEmail: '',
-    appPassword: ''
-  },
   gmailSenders: [],
-  whatsapp: {
-    phoneNumber: '',
-    accessToken: '',
-    phoneNumberId: '',
-    businessId: '',
-    templates: []
-  },
-  whatsappSenders: []
+  whatsappSenders: [],
+  activeGmailSenderId: '',
+  activeWhatsappSenderId: ''
 }

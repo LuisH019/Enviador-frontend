@@ -24,7 +24,7 @@ html, body, #root {
   @apply bg-white rounded-xl shadow-sm border;
 }
 .input {
-  @apply border rounded-md px-3 py-2;
+  @apply border rounded-md px-3 py-2 bg-white;
 }
 .btn {
   @apply inline-flex items-center gap-2 px-4 py-2 rounded-md font-medium;

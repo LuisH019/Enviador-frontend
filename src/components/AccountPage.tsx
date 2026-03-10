@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { AccountSettings, GmailSenderCard, WhatsAppSenderCard } from '../types/accountSettings'
-import { getWhatsAppConfigStatus, saveAccountSettings } from '../utils/accountSettingsStorage'
+import { saveAccountSettings } from '../utils/accountSettingsStorage'
 import { accountSettingsService } from '../services/accountSettingsService'
 import { useAuth } from '../hooks/useAuth'
 import RichTextInput from './RichTextInput'
@@ -8,6 +8,18 @@ import RichTextInput from './RichTextInput'
 export default function AccountPage() {
   const { token } = useAuth()
   const [settings, setSettings] = useState<AccountSettings>(() => accountSettingsService.getCachedSettings())
+
+  function getActiveGmailSender(config: AccountSettings): GmailSenderCard | null {
+    return config.gmailSenders.find(sender => sender.id === config.activeGmailSenderId) || config.gmailSenders[0] || null
+  }
+
+  function getActiveWhatsAppSender(config: AccountSettings): WhatsAppSenderCard | null {
+    return config.whatsappSenders.find(sender => sender.id === config.activeWhatsappSenderId) || config.whatsappSenders[0] || null
+  }
+
+  const initialActiveGmailSender = getActiveGmailSender(settings)
+  const initialActiveWhatsAppSender = getActiveWhatsAppSender(settings)
+
   const [showWhatsAppSenderForm, setShowWhatsAppSenderForm] = useState(false)
   const [editingWhatsAppSenderId, setEditingWhatsAppSenderId] = useState<string | null>(null)
   const [editingGmailSenderId, setEditingGmailSenderId] = useState<string | null>(null)
@@ -22,15 +34,14 @@ export default function AccountPage() {
   const [templateSubjectInput, setTemplateSubjectInput] = useState('')
   const [templateContentInput, setTemplateContentInput] = useState('')
 
-  const [gmailEmailInput, setGmailEmailInput] = useState(settings.gmail.senderEmail)
-  const [gmailPasswordInput, setGmailPasswordInput] = useState(settings.gmail.appPassword)
+  const [gmailEmailInput, setGmailEmailInput] = useState(initialActiveGmailSender?.senderEmail || '')
+  const [gmailPasswordInput, setGmailPasswordInput] = useState(initialActiveGmailSender?.appPassword || '')
 
-  const [phoneNumber, setPhoneNumber] = useState(settings.whatsapp.phoneNumber)
-  const [accessToken, setAccessToken] = useState(settings.whatsapp.accessToken)
-  const [phoneNumberId, setPhoneNumberId] = useState(settings.whatsapp.phoneNumberId)
-  const [businessId, setBusinessId] = useState(settings.whatsapp.businessId)
+  const [phoneNumber, setPhoneNumber] = useState(initialActiveWhatsAppSender?.phoneNumber || '')
+  const [accessToken, setAccessToken] = useState(initialActiveWhatsAppSender?.accessToken || '')
+  const [phoneNumberId, setPhoneNumberId] = useState(initialActiveWhatsAppSender?.phoneNumberId || '')
+  const [businessId, setBusinessId] = useState(initialActiveWhatsAppSender?.businessId || '')
 
-  const whatsappStatus = useMemo(() => getWhatsAppConfigStatus(settings.whatsapp), [settings.whatsapp])
   const whatsappSenderConfigured = settings.whatsappSenders.length > 0
 
   React.useEffect(() => {
@@ -45,12 +56,16 @@ export default function AccountPage() {
       .then((loaded) => {
         if (!mounted) return
         setSettings(loaded)
-        setGmailEmailInput(loaded.gmail.senderEmail)
-        setGmailPasswordInput(loaded.gmail.appPassword)
-        setPhoneNumber(loaded.whatsapp.phoneNumber)
-        setAccessToken(loaded.whatsapp.accessToken)
-        setPhoneNumberId(loaded.whatsapp.phoneNumberId)
-        setBusinessId(loaded.whatsapp.businessId)
+
+        const activeGmailSender = getActiveGmailSender(loaded)
+        const activeWhatsappSender = getActiveWhatsAppSender(loaded)
+
+        setGmailEmailInput(activeGmailSender?.senderEmail || '')
+        setGmailPasswordInput(activeGmailSender?.appPassword || '')
+        setPhoneNumber(activeWhatsappSender?.phoneNumber || '')
+        setAccessToken(activeWhatsappSender?.accessToken || '')
+        setPhoneNumberId(activeWhatsappSender?.phoneNumberId || '')
+        setBusinessId(activeWhatsappSender?.businessId || '')
       })
       .catch(() => {
         if (!mounted) return
@@ -85,7 +100,12 @@ export default function AccountPage() {
     setTemplateContentInput('')
   }
 
-  function handleAddTemplateToSender(channel: 'gmail' | 'whatsapp', senderId: string) {
+  async function handleAddTemplateToSender(channel: 'gmail' | 'whatsapp', senderId: string) {
+    if (!token) {
+      setApiMessage('Sessão inválida. Faça login novamente para salvar as configurações.')
+      return
+    }
+
     const title = templateTitleInput.trim()
     const subject = templateSubjectInput.trim()
     const content = templateContentInput.trim()
@@ -110,8 +130,24 @@ export default function AccountPage() {
         return { ...sender, templates: nextTemplates }
       })
 
-      setSettings(prev => saveAccountSettings({ ...prev, gmailSenders: nextGmailSenders }))
-      closeTemplateEditor()
+      const next = saveAccountSettings({
+        ...settings,
+        gmailSenders: nextGmailSenders
+      })
+
+      setIsSaving(true)
+      setApiMessage('')
+      try {
+        const saved = await accountSettingsService.saveSettings(token, next)
+        const merged = saveAccountSettings(saved)
+        setSettings(merged)
+        closeTemplateEditor()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Falha ao salvar template de Gmail no backend.'
+        setApiMessage(message)
+      } finally {
+        setIsSaving(false)
+      }
       return
     }
 
@@ -124,27 +160,32 @@ export default function AccountPage() {
       return { ...sender, templates: nextTemplates }
     })
 
-    const activeSender = nextWhatsappSenders.find(sender =>
-      sender.phoneNumber === settings.whatsapp.phoneNumber &&
-      sender.phoneNumberId === settings.whatsapp.phoneNumberId &&
-      sender.businessId === settings.whatsapp.businessId
-    )
+    const next = saveAccountSettings({
+      ...settings,
+      whatsappSenders: nextWhatsappSenders
+    })
 
-    setSettings(prev => saveAccountSettings({
-      ...prev,
-      whatsappSenders: nextWhatsappSenders,
-      whatsapp: activeSender
-        ? {
-            ...prev.whatsapp,
-            templates: activeSender.templates.map(template => template.title)
-          }
-        : prev.whatsapp
-    }))
-
-    closeTemplateEditor()
+    setIsSaving(true)
+    setApiMessage('')
+    try {
+      const saved = await accountSettingsService.saveSettings(token, next)
+      const merged = saveAccountSettings(saved)
+      setSettings(merged)
+      closeTemplateEditor()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao salvar template de WhatsApp no backend.'
+      setApiMessage(message)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  function handleDeleteTemplateFromSender(channel: 'gmail' | 'whatsapp', senderId: string, templateTitle: string) {
+  async function handleDeleteTemplateFromSender(channel: 'gmail' | 'whatsapp', senderId: string, templateTitle: string) {
+    if (!token) {
+      setApiMessage('Sessão inválida. Faça login novamente para salvar as configurações.')
+      return
+    }
+
     if (channel === 'gmail') {
       const nextGmailSenders = settings.gmailSenders.map(sender =>
         sender.id === senderId
@@ -152,7 +193,23 @@ export default function AccountPage() {
           : sender
       )
 
-      setSettings(prev => saveAccountSettings({ ...prev, gmailSenders: nextGmailSenders }))
+      const next = saveAccountSettings({
+        ...settings,
+        gmailSenders: nextGmailSenders
+      })
+
+      setIsSaving(true)
+      setApiMessage('')
+      try {
+        const saved = await accountSettingsService.saveSettings(token, next)
+        const merged = saveAccountSettings(saved)
+        setSettings(merged)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Falha ao excluir template de Gmail no backend.'
+        setApiMessage(message)
+      } finally {
+        setIsSaving(false)
+      }
       return
     }
 
@@ -162,22 +219,23 @@ export default function AccountPage() {
         : sender
     )
 
-    const activeSender = nextWhatsappSenders.find(sender =>
-      sender.phoneNumber === settings.whatsapp.phoneNumber &&
-      sender.phoneNumberId === settings.whatsapp.phoneNumberId &&
-      sender.businessId === settings.whatsapp.businessId
-    )
+    const next = saveAccountSettings({
+      ...settings,
+      whatsappSenders: nextWhatsappSenders
+    })
 
-    setSettings(prev => saveAccountSettings({
-      ...prev,
-      whatsappSenders: nextWhatsappSenders,
-      whatsapp: activeSender
-        ? {
-            ...prev.whatsapp,
-            templates: activeSender.templates.map(template => template.title)
-          }
-        : prev.whatsapp
-    }))
+    setIsSaving(true)
+    setApiMessage('')
+    try {
+      const saved = await accountSettingsService.saveSettings(token, next)
+      const merged = saveAccountSettings(saved)
+      setSettings(merged)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao excluir template de WhatsApp no backend.'
+      setApiMessage(message)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   async function handleSaveGmail(e: React.FormEvent) {
@@ -206,23 +264,21 @@ export default function AccountPage() {
         ? existing.map(sender => (sender.id === nextSender.id ? nextSender : sender))
         : [...existing, nextSender]
 
-    const next: AccountSettings = {
+    const next: AccountSettings = saveAccountSettings({
       ...settings,
-      gmail: nextSender,
-      gmailSenders: nextSenders
-    }
+      gmailSenders: nextSenders,
+      activeGmailSenderId: nextSender.id
+    })
 
     setIsSaving(true)
     setApiMessage('')
     try {
-      const saved = await accountSettingsService.saveGmailSettings(token, next.gmail)
-      const merged = saveAccountSettings({
-        ...saved,
-        gmailSenders: next.gmailSenders
-      })
+      const saved = await accountSettingsService.saveSettings(token, next)
+      const merged = saveAccountSettings(saved)
+      const activeSender = getActiveGmailSender(merged)
       setSettings(merged)
-      setGmailEmailInput(merged.gmail.senderEmail)
-      setGmailPasswordInput(merged.gmail.appPassword)
+      setGmailEmailInput(activeSender?.senderEmail || '')
+      setGmailPasswordInput(activeSender?.appPassword || '')
       setShowGmailForm(false)
       setEditingGmailSenderId(null)
       setGmailSaved(true)
@@ -254,22 +310,22 @@ export default function AccountPage() {
 
     const remaining = settings.gmailSenders.filter(sender => sender.id !== senderId)
     const nextActive = remaining[0]
+    const next = saveAccountSettings({
+      ...settings,
+      gmailSenders: remaining,
+      activeGmailSenderId: nextActive?.id || ''
+    })
 
     setIsSaving(true)
     setApiMessage('')
     try {
-      const saved = await accountSettingsService.saveGmailSettings(token, nextActive || {
-        senderEmail: '',
-        appPassword: ''
-      })
-      const merged = saveAccountSettings({
-        ...saved,
-        gmailSenders: remaining
-      })
+      const saved = await accountSettingsService.saveSettings(token, next)
+      const merged = saveAccountSettings(saved)
+      const activeSender = getActiveGmailSender(merged)
 
       setSettings(merged)
-      setGmailEmailInput(merged.gmail.senderEmail)
-      setGmailPasswordInput(merged.gmail.appPassword)
+      setGmailEmailInput(activeSender?.senderEmail || '')
+      setGmailPasswordInput(activeSender?.appPassword || '')
       setShowGmailForm(false)
       setEditingGmailSenderId(null)
     } catch (error) {
@@ -296,14 +352,6 @@ export default function AccountPage() {
       templates: settings.whatsappSenders.find(sender => sender.id === editingWhatsAppSenderId)?.templates || []
     }
 
-    const nextWhatsapp: AccountSettings['whatsapp'] = {
-      phoneNumber: nextSender.phoneNumber,
-      accessToken: nextSender.accessToken,
-      phoneNumberId: nextSender.phoneNumberId,
-      businessId: nextSender.businessId,
-      templates: nextSender.templates.map(template => template.title)
-    }
-
     const existing = settings.whatsappSenders
     const senderIndex = existing.findIndex(sender => sender.id === nextSender.id)
     const nextSenders =
@@ -311,26 +359,24 @@ export default function AccountPage() {
         ? existing.map(sender => (sender.id === nextSender.id ? nextSender : sender))
         : [...existing, nextSender]
 
-    const next: AccountSettings = {
+    const next: AccountSettings = saveAccountSettings({
       ...settings,
-      whatsapp: nextWhatsapp,
-      whatsappSenders: nextSenders
-    }
+      whatsappSenders: nextSenders,
+      activeWhatsappSenderId: nextSender.id
+    })
 
     setIsSaving(true)
     setApiMessage('')
     try {
-      const saved = await accountSettingsService.saveWhatsAppSettings(token, next.whatsapp)
-      const merged = saveAccountSettings({
-        ...saved,
-        whatsappSenders: next.whatsappSenders
-      })
+      const saved = await accountSettingsService.saveSettings(token, next)
+      const merged = saveAccountSettings(saved)
+      const activeSender = getActiveWhatsAppSender(merged)
 
       setSettings(merged)
-      setPhoneNumber(merged.whatsapp.phoneNumber)
-      setAccessToken(merged.whatsapp.accessToken)
-      setPhoneNumberId(merged.whatsapp.phoneNumberId)
-      setBusinessId(merged.whatsapp.businessId)
+      setPhoneNumber(activeSender?.phoneNumber || '')
+      setAccessToken(activeSender?.accessToken || '')
+      setPhoneNumberId(activeSender?.phoneNumberId || '')
+      setBusinessId(activeSender?.businessId || '')
       setWhatsappSaved(true)
       setShowWhatsAppSenderForm(false)
       setEditingWhatsAppSenderId(null)
@@ -362,39 +408,24 @@ export default function AccountPage() {
 
     const remaining = settings.whatsappSenders.filter(sender => sender.id !== senderId)
     const nextActive = remaining[0]
+    const next = saveAccountSettings({
+      ...settings,
+      whatsappSenders: remaining,
+      activeWhatsappSenderId: nextActive?.id || ''
+    })
 
     setIsSaving(true)
     setApiMessage('')
     try {
-      const saved = await accountSettingsService.saveWhatsAppSettings(
-        token,
-        nextActive
-          ? {
-              phoneNumber: nextActive.phoneNumber,
-              accessToken: nextActive.accessToken,
-              phoneNumberId: nextActive.phoneNumberId,
-              businessId: nextActive.businessId,
-              templates: nextActive.templates.map(template => template.title)
-            }
-          : {
-              phoneNumber: '',
-              accessToken: '',
-              phoneNumberId: '',
-              businessId: '',
-              templates: []
-            }
-      )
-
-      const merged = saveAccountSettings({
-        ...saved,
-        whatsappSenders: remaining
-      })
+      const saved = await accountSettingsService.saveSettings(token, next)
+      const merged = saveAccountSettings(saved)
+      const activeSender = getActiveWhatsAppSender(merged)
 
       setSettings(merged)
-      setPhoneNumber(merged.whatsapp.phoneNumber)
-      setAccessToken(merged.whatsapp.accessToken)
-      setPhoneNumberId(merged.whatsapp.phoneNumberId)
-      setBusinessId(merged.whatsapp.businessId)
+      setPhoneNumber(activeSender?.phoneNumber || '')
+      setAccessToken(activeSender?.accessToken || '')
+      setPhoneNumberId(activeSender?.phoneNumberId || '')
+      setBusinessId(activeSender?.businessId || '')
       setShowWhatsAppSenderForm(false)
       setEditingWhatsAppSenderId(null)
     } catch (error) {
@@ -431,10 +462,7 @@ export default function AccountPage() {
   function handleSelectGmailSender(sender: GmailSenderCard) {
     setSettings(prev => saveAccountSettings({
       ...prev,
-      gmail: {
-        senderEmail: sender.senderEmail,
-        appPassword: sender.appPassword
-      }
+      activeGmailSenderId: sender.id
     }))
 
     setEditingGmailSenderId(sender.id)
@@ -454,13 +482,7 @@ export default function AccountPage() {
   function handleSelectWhatsAppSender(sender: WhatsAppSenderCard) {
     setSettings(prev => saveAccountSettings({
       ...prev,
-      whatsapp: {
-        phoneNumber: sender.phoneNumber,
-        accessToken: sender.accessToken,
-        phoneNumberId: sender.phoneNumberId,
-        businessId: sender.businessId,
-        templates: sender.templates.map(template => template.title)
-      }
+      activeWhatsappSenderId: sender.id
     }))
 
     setEditingWhatsAppSenderId(sender.id)
@@ -537,7 +559,7 @@ export default function AccountPage() {
             <RichTextInput
               value={templateContentInput}
               onChange={setTemplateContentInput}
-              placeholder="Digite ou cole aqui um texto formatado (Ctrl+V com negrito, listas, etc.)"
+              placeholder="Texto da mensagem."
               minHeightClassName="min-h-[110px]"
             />
             <button type="button" className="btn btn-primary" onClick={() => handleAddTemplateToSender(channel, senderId)}>
@@ -576,7 +598,7 @@ export default function AccountPage() {
           {settings.gmailSenders.length > 0 ? (
             <div className="space-y-2 text-sm">
               {settings.gmailSenders.map((sender) => {
-                const isActive = sender.senderEmail === settings.gmail.senderEmail
+                const isActive = sender.id === settings.activeGmailSenderId
 
                 return (
                   <div
@@ -665,10 +687,7 @@ export default function AccountPage() {
           {whatsappSenderConfigured ? (
             <div className="space-y-2">
               {settings.whatsappSenders.map((sender) => {
-                const isActive =
-                  sender.phoneNumber === settings.whatsapp.phoneNumber &&
-                  sender.phoneNumberId === settings.whatsapp.phoneNumberId &&
-                  sender.businessId === settings.whatsapp.businessId
+                const isActive = sender.id === settings.activeWhatsappSenderId
 
                 return (
                   <div
