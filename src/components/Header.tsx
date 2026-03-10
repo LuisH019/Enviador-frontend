@@ -64,9 +64,6 @@ export default function Header({ onNavigate, currentPage = 'home' }: HeaderProps
               <button onClick={() => onNavigate?.('login')} className="btn btn-ghost ml-4">
                 Entrar
               </button>
-              <button onClick={() => onNavigate?.('signup')} className="btn btn-primary">
-                Cadastrar
-              </button>
             </>
           )}
         </nav>
@@ -100,9 +97,6 @@ export default function Header({ onNavigate, currentPage = 'home' }: HeaderProps
               <>
                 <button onClick={() => { setOpen(false); onNavigate?.('login') }} className="btn btn-ghost w-full mt-2">
                   Entrar
-                </button>
-                <button onClick={() => { setOpen(false); onNavigate?.('signup') }} className="btn btn-primary w-full">
-                  Cadastrar
                 </button>
               </>
             )}

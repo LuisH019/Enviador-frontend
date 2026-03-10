@@ -104,7 +104,7 @@ export default function SendPage({ onNavigate }: SendPageProps) {
   })
   const [selectedEmailTemplateTitle, setSelectedEmailTemplateTitle] = useState<string>('')
   const [selectedWhatsappSenderId, setSelectedWhatsappSenderId] = useState<string>(initialDraft?.selectedWhatsappSenderId || '')
-  const [selectedWhatsappTemplateTitle, setSelectedWhatsappTemplateTitle] = useState<string>(initialDraft?.selectedWhatsappTemplateTitle || '')
+  const [selectedWhatsappTemplateTitle, setSelectedWhatsappTemplateTitle] = useState<string>('')
   const [whatsappVariableBindings, setWhatsappVariableBindings] = useState<Record<string, VariableBinding>>(initialDraft?.whatsappVariableBindings || {})
   
   // Attachments
@@ -213,13 +213,14 @@ export default function SendPage({ onNavigate }: SendPageProps) {
       .then((loaded) => {
         if (!mounted) return
         setAccountSettings(loaded)
-        const activeEmailSender = loaded.gmailSenders.find(sender => sender.id === loaded.activeGmailSenderId)
-        const activeSender = loaded.whatsappSenders.find(sender => sender.id === loaded.activeWhatsappSenderId)
+        setSelectedEmailSender(prev => prev || loaded.gmail.senderEmail)
 
-        setSelectedEmailSender(prev => prev || activeEmailSender?.senderEmail || loaded.gmailSenders[0]?.senderEmail || '')
+        const activeSender = loaded.whatsappSenders.find(sender =>
+          sender.phoneNumber === loaded.whatsapp.phoneNumber &&
+          sender.phoneNumberId === loaded.whatsapp.phoneNumberId &&
+          sender.businessId === loaded.whatsapp.businessId
+        )
         setSelectedWhatsappSenderId(prev => prev || activeSender?.id || loaded.whatsappSenders[0]?.id || '')
-        const firstTemplate = activeSender?.templates?.[0]
-        setSelectedWhatsappTemplateTitle(prev => prev || firstTemplate?.title || '')
       })
       .catch(() => {
       })
@@ -280,19 +281,18 @@ export default function SendPage({ onNavigate }: SendPageProps) {
   }, [selectedEmailSender, accountSettings.gmailSenders])
 
   useEffect(() => {
-    if (!selectedEmailTemplateTitle && emailTemplates.length > 0) {
-      setSelectedEmailTemplateTitle(emailTemplates[0].title)
-      return
-    }
-
     const templateExists = emailTemplates.some(template => template.title === selectedEmailTemplateTitle)
-    if (!templateExists) {
-      setSelectedEmailTemplateTitle(emailTemplates[0]?.title || '')
+    if (!templateExists && selectedEmailTemplateTitle) {
+      setSelectedEmailTemplateTitle('')
     }
   }, [selectedEmailTemplateTitle, emailTemplates])
 
   useEffect(() => {
-    if (!selectedEmailTemplate) return
+    if (!selectedEmailTemplate) {
+      setSubject('')
+      setMessage('')
+      return
+    }
 
     setSubject(selectedEmailTemplate.subject || '')
     setMessage(selectedEmailTemplate.content || '')
@@ -325,14 +325,10 @@ export default function SendPage({ onNavigate }: SendPageProps) {
 
   useEffect(() => {
     if (channel !== 'whatsapp') return
-    if (!selectedWhatsappTemplateTitle && whatsappTemplates.length > 0) {
-      setSelectedWhatsappTemplateTitle(whatsappTemplates[0].title)
-      return
-    }
 
     const templateExists = whatsappTemplates.some(template => template.title === selectedWhatsappTemplateTitle)
-    if (!templateExists) {
-      setSelectedWhatsappTemplateTitle(whatsappTemplates[0]?.title || '')
+    if (!templateExists && selectedWhatsappTemplateTitle) {
+      setSelectedWhatsappTemplateTitle('')
     }
   }, [channel, selectedWhatsappTemplateTitle, whatsappTemplates])
 
